@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/Apps/">
+    <Project Path="xsltrx/xsltrx.fsproj" Id="8656ce33-4522-48ba-8cca-768215bb6452" />
+  </Folder>
+  <Folder Name="/Solution Items/">
+    <File Path=".gitignore" />
+    <File Path="README.md" />
+  </Folder>
+</Solution>
