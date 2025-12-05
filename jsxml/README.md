@@ -16,12 +16,10 @@ elements:
 | `<str>TEXT</str>` | A JSON string `"TEXT"` |
 | `<num>NUMBER</num>` | A JSON numeric value (integer or real) |
 
-~~In this initial version there is no dedicated namespace~~.
-
 Example:
 ```
 <?xml version="1.0" encoding="utf-8"?>
-<ob xmlns="https://github.com/ttelcl/TteLcl.XmlTools">
+<ob xmlns="https://github.com/ttelcl/TteLcl.XmlTools/tree/main/jsxml">
   <prop key="hello">
     <str>world</str>
   </prop>
