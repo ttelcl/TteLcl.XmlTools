@@ -16,6 +16,9 @@ let usage command =
   cp "   \fg-indent \fcspaces\f0  Save JSON indented by the specified number of \fcspaces\f0 (default \fg-indent \fc2\f0)"
   cp ""
   cp "\fg-v               \f0Verbose mode"
+  cp ""
+  cp "You can provide multiple \fg-j\f0 and \fg-x\f0 options, each defining a conversion job."
+  cp "Any \fg-o\f0 options affect the preceding \fg-j\f0 or \fg-x\f0 option."
 
 
 

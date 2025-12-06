@@ -17,9 +17,8 @@ let rec run arglist =
   | [] ->
     usage verbose
     0  // program return status code to the operating system; 0 == "OK"
-  //  *EXAMPLE*:
-  //| "foo" :: rest ->
-  //  rest |> AppFoo.runFoo
+  | x :: _ when x.StartsWith('-') ->
+    arglist |> App.run
   | _ :: _ ->
     // TODO: actual processing based on command line arguments
     new NotImplementedException("jsxml.exe is not yet implemented") |> raise
