@@ -6,6 +6,10 @@ open System.Xml
 open System.Xml.XPath
 open System.Xml.Xsl
 
+open Newtonsoft.Json
+
+open TteLcl.JxSmoln
+
 open ColorPrint
 open CommonTools
 
@@ -23,8 +27,26 @@ let private convertJsonToXml o jsonIn xmlOut =
   1
 
 let private convertXmlToJson o xmlIn jsonOut =
-  cp "\frNot Yet Implemented!\f0 (xml to json)"
-  1
+  let formatting =
+    match o.JsonIndent with
+    | 0 -> Formatting.None
+    | 2 -> Formatting.Indented
+    | _ ->
+      failwith "Json indents other than 0 (none) or 2 are not yet supported."
+  let jsonOut =
+    if jsonOut |> String.IsNullOrEmpty then
+      Path.ChangeExtension(xmlIn, ".json")
+    else
+      jsonOut
+  let node =
+    use xr = XmlReader.Create(xmlIn)
+    xr |> JxConversion.ReadJsonFromXml
+  do
+    let json = JsonConvert.SerializeObject(node, formatting)
+    use w = jsonOut |> startFile
+    w.WriteLine(json)
+  jsonOut |> finishFile
+  0
 
 let private runConversion o conversion =
   match conversion with
