@@ -82,7 +82,8 @@ let private runTransform o =
   let rec getPipelineOutputMethod transformList =
     match transformList with
     | trx :: [] ->
-      trx.LoadedTransform.OutputSettings.OutputMethod |> Some
+      let om = trx.LoadedTransform.OutputSettings.OutputMethod
+      om |> Some
     | trx :: rest ->
       let outputMethod = trx.LoadedTransform.OutputSettings.OutputMethod
       if outputMethod <> XmlOutputMethod.Xml then
@@ -95,6 +96,9 @@ let private runTransform o =
       None
   let lastOutputMethod = pipeline |> getPipelineOutputMethod
   match lastOutputMethod with
+  | None ->
+    // an error was printed already
+    1
   | Some(lastOutputMethod) ->
     let defaultExtension =
       match lastOutputMethod with
@@ -158,9 +162,6 @@ let private runTransform o =
       //  transform.Transform(input, arglist, output) |> ignore
       //output |> finishFile
     0
-  | None ->
-    // an error was printed already
-    1
 
 let run args =
   let rec parseMore o args =
