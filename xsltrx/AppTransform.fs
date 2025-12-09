@@ -22,18 +22,22 @@ type private Options = {
 let private runTransform o =
   // see also https://github.com/devlooped/Mvp.Xml/blob/main/src/Mvp.Xml/Exslt/Xsl/MvpXslTransform.cs
   let doc = new XPathDocument(o.Input)
-  let xsltFile =
-    // To Do: extract stylesheet from document if o.StyleSheet is missing
-    o.Stylesheet
-  let transform =
-    let trx = new MvpXslTransform()
+  
+  // To Do: extract stylesheet from document if o.StyleSheet is missing
+
+  // Create a transform loader function with a memoized resolver and settings if applicable
+  let transformloader: MvpXslTransform -> string -> unit =
     if o.EnableDocumentFunction then
       let resolver = XmlResolver.FileSystemResolver
       let settings = new XsltSettings(o.EnableDocumentFunction, false)
-      trx.Load(xsltFile, settings, resolver)
+      fun trx xsltFile -> trx.Load(xsltFile, settings, resolver)
     else
-      trx.Load(xsltFile)
+      fun trx xsltFile -> trx.Load(xsltFile)
+  let createTransform xsltFile =
+    let trx = new MvpXslTransform()
+    transformloader trx xsltFile
     trx
+  let transform = o.Stylesheet |> createTransform
   do
     use tw = o.Output |> startFile
     let arglist = new XsltArgumentList()
