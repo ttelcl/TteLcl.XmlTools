@@ -28,7 +28,7 @@ type private Transformation = {
 }
 
 type private Options = {
-  Stylesheet: string
+  Stylesheets: string list
   EnableDocumentFunction: bool
   InOutPairs: InputOutput list
   OutputDerivations: OutputDerivation list
@@ -74,7 +74,7 @@ let private runTransform o =
     cp $"Loading stylesheet \fb{xsltFile}\f0."
     transformloader trx xsltFile
     trx
-  let stylesheets = [ o.Stylesheet ] // preparing for future pipeline
+  let stylesheets = o.Stylesheets
   let pipeline =
     stylesheets
     |> List.map (fun ss -> {XsltFile = ss; LoadedTransform = ss |> createTransform})
@@ -121,10 +121,12 @@ let private runTransform o =
         pair
     let pairs = o.InOutPairs |> List.map resolveOutput
     let transformIntermediate trx (xin:XmlInput) =
+      cp $"  Applying intermediate transform \fc{trx.XsltFile}\f0."
       let arglist = new XsltArgumentList()
-      let xout = trx.LoadedTransform.Transform(xin, arglist)
+      let xout = trx.LoadedTransform.Transform(xin, arglist, false, 256 (* that's the default *))
       new XmlInput(xout)
     let transformLast trx outname (xin:XmlInput) =
+      cp $"  Applying final transform \fc{trx.XsltFile}\f0 (mode \fb{trx.LoadedTransform.OutputSettings.OutputMethod}\f0)."
       let arglist = new XsltArgumentList()
       // PLACEHOLDER!
       do
@@ -176,7 +178,7 @@ let run args =
       }
       rest |> parseMore {o with InOutPairs = pair :: o.InOutPairs}
     | "-s" :: stylesheet :: rest ->
-      rest |> parseMore {o with Stylesheet = stylesheet}
+      rest |> parseMore {o with Stylesheets = stylesheet :: o.Stylesheets}
     | "-o" :: outfile :: rest ->
       match o.InOutPairs with
       | head :: others ->
@@ -195,19 +197,19 @@ let run args =
       | Some(d) ->
         rest |> parseMore {o with OutputDerivations = d :: o.OutputDerivations}
     | [] ->
-      if o.Stylesheet |> String.IsNullOrEmpty then
+      if o.Stylesheets |> List.isEmpty then
         cp "\foNo stylesheet file (\fg-s\fo) given\f0."
         None
       elif o.InOutPairs |> List.isEmpty then
         cp "\foNo input files (\fg-f\fo) given\f0."
         None
       else
-        {o with OutputDerivations = o.OutputDerivations |> List.rev} |> Some
+        {o with OutputDerivations = o.OutputDerivations |> List.rev; Stylesheets = o.Stylesheets |> List.rev} |> Some
     | x :: _ ->
       cp $"\frUnrecognized argument \f0'\fy{x}\f0'"
       None
   let oo = args |> parseMore {
-    Stylesheet = null
+    Stylesheets = []
     InOutPairs = []
     EnableDocumentFunction = false
     OutputDerivations = []
