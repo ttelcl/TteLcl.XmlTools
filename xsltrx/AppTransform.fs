@@ -16,6 +16,7 @@ type private Options = {
   Stylesheet: string
   Input: string
   Output: string
+  EnableDocumentFunction: bool
 }
 
 let private runTransform o =
@@ -26,7 +27,12 @@ let private runTransform o =
     o.Stylesheet
   let transform =
     let trx = new MvpXslTransform()
-    trx.Load(xsltFile)
+    if o.EnableDocumentFunction then
+      let resolver = XmlResolver.FileSystemResolver
+      let settings = new XsltSettings(o.EnableDocumentFunction, false)
+      trx.Load(xsltFile, settings, resolver)
+    else
+      trx.Load(xsltFile)
     trx
   do
     use tw = o.Output |> startFile
@@ -52,6 +58,10 @@ let run args =
       rest |> parseMore {o with Stylesheet = stylesheet}
     | "-o" :: outfile :: rest ->
       rest |> parseMore {o with Output = outfile}
+    | "-doc" :: rest ->
+      // voodoo inferred from https://stackoverflow.com/a/77903294/271323
+      AppContext.SetSwitch("Switch.System.Xml.AllowDefaultResolver", true);
+      rest |> parseMore {o with EnableDocumentFunction = true}
     | [] ->
       if o.Stylesheet |> String.IsNullOrEmpty then
         cp "\foNo stylesheet file (\fg-s\fo) given\f0."
@@ -72,6 +82,7 @@ let run args =
     Stylesheet = null
     Input = null
     Output = null
+    EnableDocumentFunction = false
   }
   match oo with
   | Some(o) ->
