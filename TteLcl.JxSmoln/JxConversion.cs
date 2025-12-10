@@ -45,7 +45,7 @@ public static class JxConversion
   public static IEnumerable<JToken> ReadMultiJsonFromXml(XmlReader reader)
   {
     var kind = reader.MoveToContent();
-    TraceReader(reader);
+    TraceReader(reader, "looking for multi-json node");
     if(kind != XmlNodeType.None) // else return nothing
     {
       if(kind != XmlNodeType.Element)
@@ -64,27 +64,28 @@ public static class JxConversion
       {
         if(!reader.IsEmptyElement) // else return nothing
         {
-          while(reader.Read())
+          reader.Read();
+          reader.MoveToContent();
+          while(reader.IsStartElement())
           {
+            TraceReader(reader, "start of multi-json item");
+            var item = ReadJsonFromXml(reader);
             reader.MoveToContent();
-            TraceReader(reader);
-            if(reader.NodeType == XmlNodeType.EndElement)
-            {
-              reader.Read();
-              TraceReader(reader);
-              break; // we're done
-            }
-            if(reader.NodeType == XmlNodeType.Element)
-            {
-              var item = ReadJsonFromXml(reader);
-              yield return item;
-            }
-            else
-            {
-              throw new InvalidOperationException(
-                $"Unexpected content in <j:multi> element. Expecting elements, but found a '{reader.NodeType}'");
-            }
+            yield return item;
           }
+          TraceReader(reader, "leaving multi-json content");
+          if(reader.NodeType != XmlNodeType.EndElement)
+          {
+            throw new InvalidOperationException(
+              $"Unexpected node type inside <j:multi>: '{reader.NodeType}'");
+          }
+          if(reader.LocalName != "multi")
+          {
+            throw new InvalidOperationException(
+              $"Unexpected end-of-element node inside <j:multi>: </{reader.Name}>");
+          }
+          reader.Skip();
+          TraceReader(reader, $"completed <j:multi>, and moved beyond");
         }
       }
       else
@@ -92,6 +93,8 @@ public static class JxConversion
         // Not multi-json, just a plain single node.
         // Do not consider this an error, just return that node
         var node = ReadJsonFromXml(reader);
+        reader.MoveToContent();
+        TraceReader(reader, "completed the single item as if in a multi-json list");
         yield return node;
       }
     }
@@ -100,6 +103,8 @@ public static class JxConversion
   /// <summary>
   /// Read the next JSON token from its XML representation. If necessary
   /// this method first moves the reader to the next content node.
+  /// Upon return the reader points beyond the end of the element it initially
+  /// pointed at.
   /// This method does not support multi-json (&lt;j:mjson&gt;).
   /// </summary>
   /// <param name="reader"></param>
@@ -108,7 +113,7 @@ public static class JxConversion
   public static JToken ReadJsonFromXml(XmlReader reader)
   {
     var kind = reader.MoveToContent();
-    TraceReader(reader);
+    TraceReader(reader, "dispatcher");
     if(kind == XmlNodeType.None)
     {
       throw new InvalidOperationException(
@@ -144,15 +149,15 @@ public static class JxConversion
         return ReadNumberNode(reader);
       case "true":
         reader.Skip();
-        TraceReader(reader);
+        TraceReader(reader, "completed <j:true>");
         return new JValue(true);
       case "false":
         reader.Skip();
-        TraceReader(reader);
+        TraceReader(reader, "completed <j:false>");
         return new JValue(false);
       case "null":
         reader.Skip();
-        TraceReader(reader);
+        TraceReader(reader, "completed <j:null>");
         return JValue.CreateNull();
       case "list":
         return ReadListNode(reader);
@@ -173,7 +178,7 @@ public static class JxConversion
   private static JValue ReadStringNode(XmlReader reader)
   {
     var text = reader.ReadElementContentAsString("str", JxSmolnNamespace);
-    TraceReader(reader);
+    TraceReader(reader, $"string value == '{text}'");
     return JValue.CreateString(text);
   }
 
@@ -202,6 +207,13 @@ public static class JxConversion
     }
   }
 
+  /// <summary>
+  /// Given an XML reader positioned on a {j:list} node, read the entire list
+  /// and move the reader beyond the end of the list
+  /// </summary>
+  /// <param name="reader"></param>
+  /// <returns></returns>
+  /// <exception cref="InvalidOperationException"></exception>
   private static JArray ReadListNode(XmlReader reader)
   {
     if(!reader.IsStartElement("list", JxSmolnNamespace))
@@ -212,35 +224,42 @@ public static class JxConversion
     var list = new JArray();
     if(reader.IsEmptyElement)
     {
-      reader.Read();
-      TraceReader(reader);
+      reader.Skip();
+      TraceReader(reader, "completed empty list and moved beyond");
       return list;
     }
-    while(reader.Read())
+    reader.Read(); // jump into the list
+    reader.MoveToContent();
+    while(reader.IsStartElement())
     {
+      TraceReader(reader, "start of list item");
+      var item = ReadJsonFromXml(reader);
       reader.MoveToContent();
-      TraceReader(reader);
-      if(reader.NodeType == XmlNodeType.EndElement)
-      {
-        //reader.Read();
-        //TraceReader(reader);
-        return list;
-      }
-      if(reader.NodeType == XmlNodeType.Element)
-      {
-        var item = ReadJsonFromXml(reader);
-        list.Add(item);
-      }
-      else
-      {
-        throw new InvalidOperationException(
-          $"Unexpected content in <j:list> element. Expecting elements, but found a '{reader.NodeType}'");
-      }
+      list.Add(item);
     }
-    throw new InvalidOperationException(
-      "Unexpected EOF while reading a <j:list>.");
+    TraceReader(reader, "leaving list content");
+    if(reader.NodeType != XmlNodeType.EndElement)
+    {
+      throw new InvalidOperationException(
+        $"Unexpected node type inside <j:list>: '{reader.NodeType}'");
+    }
+    if(reader.LocalName != "list")
+    {
+      throw new InvalidOperationException(
+        $"Unexpected end-of-element node inside <j:list>: </{reader.Name}>");
+    }
+    reader.Skip();
+    TraceReader(reader, $"completed <j:list> with {list.Count} items, and moved beyond");
+    return list;
   }
 
+  /// <summary>
+  /// Given an XML reader positioned on a {j:ob} node, read the entire object
+  /// and move the reader beyond the end of the object
+  /// </summary>
+  /// <param name="reader"></param>
+  /// <returns></returns>
+  /// <exception cref="InvalidOperationException"></exception>
   private static JObject ReadObjectNode(XmlReader reader)
   {
     if(!reader.IsStartElement("ob", JxSmolnNamespace))
@@ -251,32 +270,39 @@ public static class JxConversion
     var ob = new JObject();
     if(reader.IsEmptyElement)
     {
-      reader.Read();
-      TraceReader(reader);
+      reader.Skip();
+      TraceReader(reader, "completed empty object and moved beyond");
       return ob;
     }
-    while(reader.Read())
+    reader.Read();
+    while(reader.IsStartElement("prop", JxSmolnNamespace))
     {
-      //TraceReader(reader);
-      reader.MoveToContent();
-      TraceReader(reader);
-      if(reader.NodeType == XmlNodeType.EndElement)
-      {
-        //reader.Read();
-        //TraceReader(reader);
-        return ob;
-      }
-      if(!reader.IsStartElement("prop", JxSmolnNamespace))
-      {
-        throw new InvalidOperationException(
-          $"Expecting all child elements of <j:ob> to be <j:prop>, but encountered a '{reader.NodeType}' named '{reader.LocalName}' instead.");
-      }
+      TraceReader(reader, "start of property");
       ReadProperty(reader, ob);
     }
-    throw new InvalidOperationException(
-      "Unexpected EOF while reading a <j:ob>.");
+    TraceReader(reader, "leaving object content");
+    if(reader.NodeType != XmlNodeType.EndElement)
+    {
+      throw new InvalidOperationException(
+        $"Unexpected node inside <j:ob>: type '{reader.NodeType}' ({reader.Name})");
+    }
+    if(reader.LocalName != "ob")
+    {
+      throw new InvalidOperationException(
+        $"Unexpected end-of-element node inside <j:ob>: </{reader.Name}>");
+    }
+    reader.Skip();
+    TraceReader(reader, $"completed <j:ob> with {ob.Count} properties, and moved beyond");
+    return ob;
   }
 
+  /// <summary>
+  /// Given an XML reader positioned on a {j:prop} node, read the entire property
+  /// and move the reader beyond the end of the property
+  /// </summary>
+  /// <param name="reader"></param>
+  /// <param name="ob"></param>
+  /// <exception cref="InvalidOperationException"></exception>
   private static void ReadProperty(XmlReader reader, JObject ob)
   {
     if(!reader.IsStartElement("prop", JxSmolnNamespace))
@@ -300,35 +326,39 @@ public static class JxConversion
       throw new InvalidOperationException(
         $"Duplicate property name '{name}'");
     }
+    TraceReader(reader, $"key = '{name}'");
     reader.Read();
-    TraceReader(reader);
+    reader.MoveToContent();
+    TraceReader(reader, $"moved to start of content for '{name}'");
     var value = ReadJsonFromXml(reader);
     reader.MoveToContent();
-    TraceReader(reader);
-    if(reader.NodeType != XmlNodeType.EndElement)
+    TraceReader(reader, $"finished reading property '{name}'");
+    if(reader.NodeType != XmlNodeType.EndElement || reader.LocalName != "prop")
     {
       throw new InvalidOperationException(
-        $"Expecting </j:prop> after <j:prop>'s content");
+        $"Expecting </j:prop> after <j:prop key='{name}'>'s content");
     }
-    //reader.Read();
-    //TraceReader(reader);
+    reader.ReadEndElement();
+    reader.MoveToContent();
+    TraceReader(reader, $"Completed <j:prop> '{name}', and moved beyond");
     ob.Add(name, value);
   }
 
   private static void TraceReader(
     XmlReader reader,
+    string? message = null,
     [CallerLineNumber] int lineNumber = 0,
     [CallerMemberName] string? caller = null)
   {
     if(ReaderTracer!=null)
     {
-      ReaderTracer(reader, lineNumber, caller ?? "???");
+      ReaderTracer(reader, message, lineNumber, caller ?? "???");
     }
   }
   
   /// <summary>
   /// A delegate that, if set, is spammed with callbacks whenever the XML source advances
   /// </summary>
-  public static Action<XmlReader, int, string>? ReaderTracer { get; set; }
+  public static Action<XmlReader, string?, int, string>? ReaderTracer { get; set; }
 }
 

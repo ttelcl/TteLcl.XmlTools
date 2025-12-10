@@ -20,13 +20,31 @@ type private ConversionJob =
 type private Options = {
   Jobs: ConversionJob list
   JsonIndent: int
+  TraceJson: bool
 }
+
+// Debug utility for JsonConversion
+let traceJson (reader: XmlReader) (message: string) (line: int) (caller: string) =
+  cpx $"\fb{line,4}\fo:\fw{caller,-20} \fg{reader.NodeType,-12}\f0 "
+  match reader.NodeType with
+  | XmlNodeType.Element ->
+    if reader.IsEmptyElement then
+      cpx $"\fr<\fc{reader.Name}\fr/>\f0"
+    else
+      cpx $"\fo<\fc{reader.Name}\fo>\f0"
+  | XmlNodeType.EndElement -> cpx $"\fo</\fc{reader.Name}\fo>\f0"
+  | _ -> cpx $"'\fy{reader.Name}\f0'"
+  if message |> String.IsNullOrEmpty |> not then
+    cpx $"\t\f0(\fy{message}\f0)"
+  cp ""
 
 let private convertJsonToXml o jsonIn xmlOut =
   cp "\frNot Yet Implemented!\f0 (json to xml)"
   1
 
 let private convertXmlToJson o xmlIn jsonOut =
+  if o.TraceJson then
+    JxConversion.ReaderTracer <- (fun rdr message line caller -> traceJson rdr message line caller)
   let formatting =
     match o.JsonIndent with
     | 0 -> Formatting.None
@@ -74,6 +92,8 @@ let run args =
     | "-x" :: xmlFile :: rest ->
       let job = ConversionJob.XmlToJson(xmlFile, null)
       rest |> parseMore {o with Jobs = job :: o.Jobs}
+    | "-trace" :: rest ->
+      rest |> parseMore {o with TraceJson = true}
     | "-o" :: outfile :: rest ->
       match o.Jobs with
       | JsonToXml(json, _) :: jobs ->
@@ -104,6 +124,7 @@ let run args =
   let oo = args |> parseMore {
     Jobs = []
     JsonIndent = 2
+    TraceJson = false
   }
   match oo with
   | Some(o) ->
