@@ -25,9 +25,15 @@ type private InputOutput = {
   Output: string
 }
 
+type private TransformStage = {
+  TransformFile: string
+  DiagnosticAbort: bool // if set: emit a diagnostic file after transformation and abort
+}
+
 type private Transformation = {
   XsltFile: string
   LoadedTransform: MvpXslTransform
+  DiagnosticAbort: bool // if set: emit a diagnostic file after transformation and abort
 }
 
 type private JsonFormat =
@@ -38,12 +44,22 @@ type private JsonFormat =
   // | MultiFlat
 
 type private Options = {
-  Stylesheets: string list
+  Stylesheets: TransformStage list
   EnableDocumentFunction: bool
   InOutPairs: InputOutput list
   OutputDerivations: OutputDerivation list
   JsonMode: JsonFormat
+  TraceJson: bool
 }
+
+// Debug utility for JsonConversion
+let private traceJson (reader: XmlReader) (line: int) (caller: string) =
+  cpx $"\fb{line,4}\fo:\fw{caller,-20} \fg{reader.NodeType,-12}\f0 "
+  match reader.NodeType with
+  | XmlNodeType.Element -> cpx $"\fo<\fc{reader.Name}\fo>\f0"
+  | XmlNodeType.EndElement -> cpx $"\fo</\fc{reader.Name}\fo>\f0"
+  | _ -> cpx $"'\fy{reader.Name}\f0'"
+  cp ""
 
 let private tryParseDerivation (derivation: string) =
   let parts = derivation.Split(':')
@@ -67,7 +83,7 @@ let private tryDeriveOutput derivations input =
   |> Seq.choose (tryDerive input)
   |> Seq.tryHead
 
-let private diagnostic (filename:string) (xr: XmlReader) =
+let private diagnosticAbort (filename:string) (xr: XmlReader) =
   cp $"\foWriting diagnostic dump \fr{filename}\f0."
   let xws = new XmlWriterSettings()
   xws.CloseOutput <- true
@@ -76,8 +92,15 @@ let private diagnostic (filename:string) (xr: XmlReader) =
   xw.WriteNode(xr, true)
   failwith "Aborting after writing diagnostic file"
 
+let cacheReader (xrdr:XmlReader) =
+  new XPathDocument(xrdr)
+
 let private emitJson mode filename xrdr =
-  xrdr |> diagnostic "diag.xml"
+  // The XmlReader produced by MvpXslTransform.Transform and the one taken by
+  // JxConversion.ReadJsonFromXml disagree on their expectations for behaviour.
+  // As a hack, materialize the XML document first
+  let doc = xrdr |> cacheReader
+  let xrdr = doc.CreateNavigator().ReadSubtree()
   let isMulti =
     match mode with
     | JsonFormat.NotJson ->
@@ -125,7 +148,11 @@ let private runTransform o =
   let stylesheets = o.Stylesheets
   let pipeline =
     stylesheets
-    |> List.map (fun ss -> {XsltFile = ss; LoadedTransform = ss |> createTransform})
+    |> List.map
+      (fun ss -> {
+        XsltFile = ss.TransformFile
+        LoadedTransform = ss.TransformFile |> createTransform
+        DiagnosticAbort = ss.DiagnosticAbort})
   // validate output method of intermediate stages and return the final output method
   let rec getPipelineOutputMethod transformList =
     match transformList with
@@ -187,9 +214,14 @@ let private runTransform o =
       cp $"  Applying intermediate transform \fc{trx.XsltFile}\f0."
       let arglist = new XsltArgumentList()
       let xout = trx.LoadedTransform.Transform(xin, arglist, false, 256 (* that's the default *))
+      if trx.DiagnosticAbort then
+        let diagname = Path.ChangeExtension(Path.GetFileName(trx.XsltFile), ".diag.xml")
+        xout |> diagnosticAbort diagname
       xout
     let transformLast trx outname (xin:XmlInput) =
       cp $"  Applying final transform \fc{trx.XsltFile}\f0 (mode \fb{trx.LoadedTransform.OutputSettings.OutputMethod}\f0)."
+      if trx.DiagnosticAbort then
+        cp "  (\frIgnoring \fg-diag\fr for final transform stage\f0)"
       let arglist = new XsltArgumentList()
       do
         use tw = outname |> startFile
@@ -198,6 +230,8 @@ let private runTransform o =
       outname |> finishFile
     let transformJson outname (xrdr:XmlReader) =
       cp $"  Converting to JSON (format '\fg{o.JsonMode}\f0')"
+      if o.TraceJson then
+        JxConversion.ReaderTracer <- (fun rdr line caller -> traceJson rdr line caller)
       xrdr |> emitJson o.JsonMode outname
     let transformJsonLast trx outname (xin:XmlInput) =
       let xout = xin |> transformIntermediate trx
@@ -240,7 +274,11 @@ let run args =
       }
       rest |> parseMore {o with InOutPairs = pair :: o.InOutPairs}
     | "-s" :: stylesheet :: rest ->
-      rest |> parseMore {o with Stylesheets = stylesheet :: o.Stylesheets}
+      let stage = {
+        TransformFile = stylesheet
+        DiagnosticAbort = false
+      }
+      rest |> parseMore {o with Stylesheets = stage :: o.Stylesheets}
     | "-o" :: outfile :: rest ->
       match o.InOutPairs with
       | head :: others ->
@@ -268,6 +306,16 @@ let run args =
     | "-jsonl" :: rest ->
       cp "\frNot yet implemented: \fy-jsonl\f0."
       None
+    | "-diag" :: rest ->
+      match o.Stylesheets with
+      | head :: others ->
+        let stage = {head with DiagnosticAbort = true}
+        rest |> parseMore {o with Stylesheets = stage :: others}
+      | [] ->
+        cp $"\fr'fg-diag\fr' applies to the preceding '\fg-s\fr', but there were none of those yet\f0."
+        None
+    | "-trace" :: rest ->
+      rest |> parseMore {o with TraceJson = true}
     | [] ->
       if o.Stylesheets |> List.isEmpty then
         cp "\foNo stylesheet file (\fg-s\fo) given\f0."
@@ -286,6 +334,7 @@ let run args =
     EnableDocumentFunction = false
     OutputDerivations = []
     JsonMode = JsonFormat.NotJson
+    TraceJson = false
   }
   match oo with
   | Some(o) ->

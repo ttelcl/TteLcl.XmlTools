@@ -6,12 +6,13 @@ open ColorPrint
 
 let usage focus =
   cp "\foTool for applying XSLT style sheets\f0."
-  cp "\foxsltrx \fg-s \fcstylesheet.xslt \f0{\fg-f \fcdoc.xml\f0} [\fg-o \fcoutfile\f0] {\fg-O \fcinTail\fo:\fcoutTail\f0} [\fg-doc\f0]"
+  cp "\foxsltrx \f0{\fg-s \fcstylesheet.xslt \f0[\fg-diag\f0]} {\fg-f \fcdoc.xml\f0 [\fg-o \fcoutfile\f0]} {\fg-O \fcinTail\fo:\fcoutTail\f0} [\fg-doc\f0]"
   cp "   Apply an XSLT transform to an XML document. Supports EXSLT and other extensions."
   cp "\fg-s \fcstylesheet.xslt\f0     Add a transform pipeline step using the given stylesheet. There must be at least one."
   cp "\fx\fx\fx                       All except the last must have output method 'XML'."
+  cp "\fg-diag\f0\fx                  Debug aid: Abort after the preceding transform stage (\fg-s\f0) and dump its output xml to a *.diag.xml file"
   cp "\fg-f \fcdoc.xml\f0             The document(s) to transform. Repeatable"
-  cp "\fg-o \fcoutfile\f0             The output file. By default derived from the preceding document (\fg-f\f0)"
+  cp "\fg-o \fcoutfile\f0             The output file for the preceding document (\fg-f\f0). By default derived from that preceding document"
   cp "\fg-doc\f0\fx                   Enable the XSLT \fodocument()\f0 function. Without this it is disabled."
   cp "\fx\fx\fx                       Even when given, only filesystem based documents are allowed."
   cp "\fg-O \fcinTail\fo:\fcoutTail\f0      Add a rule to derive the output name from an input (\fg-f\f0) name."
