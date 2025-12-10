@@ -170,6 +170,136 @@ public static class JxConversion
   }
 
   /// <summary>
+  /// Convert JSON content to XML
+  /// </summary>
+  /// <param name="reader">
+  /// The <see cref="JsonReader"/> pointing to the JSON to write, still in its
+  /// '<see cref="JsonToken.None"/>' state
+  /// </param>
+  /// <param name="writer"></param>
+  /// <exception cref="InvalidOperationException"></exception>
+  public static void WriteJsonToXmlDocument(JsonReader reader, XmlWriter writer)
+  {
+    writer.WriteStartDocument();
+    if(reader.TokenType != JsonToken.None)
+    {
+      throw new InvalidOperationException(
+        "Expecting a new JsonReader (in state 'None')");
+    }
+    if(!reader.Read())
+    {
+      throw new InvalidOperationException(
+        "Not expecting an empty JsonReader");
+    }
+    var result = WriteJsonItem(reader, writer);
+    if(result)
+    {
+      throw new InvalidOperationException(
+        $"Expecting EOF but found {reader.TokenType}");
+    }
+    writer.WriteEndDocument();
+  }
+
+  private static void ReadNotEnd(JsonReader reader)
+  {
+    if(!reader.Read())
+    {
+      throw new InvalidOperationException(
+        "Unexpected EOF while reading JSON");
+    }
+  }
+
+  /// <summary>
+  /// Write the JSON item that <paramref name="reader"/> currently points at
+  /// and advance the reader to the next item
+  /// to <paramref name="writer"/>
+  /// </summary>
+  /// <param name="reader"></param>
+  /// <param name="writer"></param>
+  private static bool WriteJsonItem(JsonReader reader, XmlWriter writer)
+  {
+    switch(reader.TokenType)
+    {
+      case JsonToken.StartObject:
+        return WriteJsonObject(reader, writer);
+      case JsonToken.StartArray:
+        return WriteJsonArray(reader, writer);
+      case JsonToken.Integer:
+        var i = (long)reader.Value!;
+        writer.WriteStartElement("j", "num", JxSmolnNamespace);
+        writer.WriteValue(i);
+        writer.WriteEndElement();
+        return reader.Read();
+      case JsonToken.Float:
+        var f = (double)reader.Value!;
+        writer.WriteStartElement("j", "num", JxSmolnNamespace);
+        writer.WriteValue(f);
+        writer.WriteEndElement();
+        return reader.Read();
+      case JsonToken.String:
+        var s = (string)reader.Value!;
+        writer.WriteStartElement("j", "str", JxSmolnNamespace);
+        writer.WriteValue(s);
+        writer.WriteEndElement();
+        return reader.Read();
+      case JsonToken.Boolean:
+        var b = (bool)reader.Value!;
+        if(b)
+        {
+          writer.WriteStartElement("j", "true", JxSmolnNamespace);
+        }
+        else
+        {
+          writer.WriteStartElement("j", "false", JxSmolnNamespace);
+        }
+        writer.WriteEndElement();
+        return reader.Read();
+      case JsonToken.Null:
+        writer.WriteStartElement("j", "null", JxSmolnNamespace);
+        writer.WriteEndElement();
+        return reader.Read();
+      default:
+        throw new NotSupportedException(
+          $"Unexpected JSON token type : {reader.TokenType}");
+    }
+  }
+
+  private static bool WriteJsonObject(JsonReader reader, XmlWriter writer)
+  {
+    writer.WriteStartElement("j", "ob", JxSmolnNamespace);
+    ReadNotEnd(reader);
+    while(reader.TokenType != JsonToken.EndObject)
+    {
+      if(reader.TokenType != JsonToken.PropertyName)
+      {
+        throw new InvalidOperationException(
+          "Expecting a property name");
+      }
+      var propertyName = (string)reader.Value! 
+        ?? throw new InvalidOperationException("Expecting property names to be strings");
+      writer.WriteStartElement("j", "prop", JxSmolnNamespace);
+      writer.WriteAttributeString("key", propertyName);
+      ReadNotEnd(reader);
+      WriteJsonItem(reader, writer);
+      writer.WriteEndElement();
+    }
+    writer.WriteEndElement();
+    return reader.Read();
+  }
+
+  private static bool WriteJsonArray(JsonReader reader, XmlWriter writer)
+  {
+    writer.WriteStartElement("j", "list", JxSmolnNamespace);
+    ReadNotEnd(reader);
+    while(reader.TokenType != JsonToken.EndArray)
+    {
+      WriteJsonItem(reader, writer);
+    }
+    writer.WriteEndElement();
+    return reader.Read();
+  }
+
+  /// <summary>
   /// Given an XML reader positioned on a {j:str} node, return the string content
   /// and move the reader beyond the end of the node.
   /// </summary>
