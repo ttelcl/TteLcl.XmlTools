@@ -53,7 +53,7 @@ type private Options = {
 }
 
 // Debug utility for JsonConversion
-let private traceJson (reader: XmlReader) (message: string) (line: int) (caller: string) =
+let traceJson (reader: XmlReader) (message: string) (line: int) (caller: string) =
   cpx $"\fb{line,4}\fo:\fw{caller,-20} \fg{reader.NodeType,-12}\f0 "
   match reader.NodeType with
   | XmlNodeType.Element ->

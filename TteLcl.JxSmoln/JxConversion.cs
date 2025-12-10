@@ -77,6 +77,7 @@ public static class JxConversion
             if(reader.NodeType == XmlNodeType.Element)
             {
               var item = ReadJsonFromXml(reader);
+              reader.MoveToContent();
               yield return item;
             }
             else
@@ -92,6 +93,7 @@ public static class JxConversion
         // Not multi-json, just a plain single node.
         // Do not consider this an error, just return that node
         var node = ReadJsonFromXml(reader);
+        reader.MoveToContent();
         yield return node;
       }
     }
@@ -231,6 +233,7 @@ public static class JxConversion
     {
       TraceReader(reader, "start of list item");
       var item = ReadJsonFromXml(reader);
+      reader.MoveToContent();
       list.Add(item);
     }
     TraceReader(reader, "leaving list content");
@@ -327,6 +330,7 @@ public static class JxConversion
     reader.MoveToContent();
     TraceReader(reader, $"moved to start of content for '{name}'");
     var value = ReadJsonFromXml(reader);
+    reader.MoveToContent();
     TraceReader(reader, $"finished reading property '{name}'");
     if(reader.NodeType != XmlNodeType.EndElement || reader.LocalName != "prop")
     {
