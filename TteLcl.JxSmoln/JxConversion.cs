@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
 using System.Xml;
@@ -44,6 +45,7 @@ public static class JxConversion
   public static IEnumerable<JToken> ReadMultiJsonFromXml(XmlReader reader)
   {
     var kind = reader.MoveToContent();
+    TraceReader(reader);
     if(kind != XmlNodeType.None) // else return nothing
     {
       if(kind != XmlNodeType.Element)
@@ -65,9 +67,11 @@ public static class JxConversion
           while(reader.Read())
           {
             reader.MoveToContent();
+            TraceReader(reader);
             if(reader.NodeType == XmlNodeType.EndElement)
             {
               reader.Read();
+              TraceReader(reader);
               break; // we're done
             }
             if(reader.NodeType == XmlNodeType.Element)
@@ -104,6 +108,7 @@ public static class JxConversion
   public static JToken ReadJsonFromXml(XmlReader reader)
   {
     var kind = reader.MoveToContent();
+    TraceReader(reader);
     if(kind == XmlNodeType.None)
     {
       throw new InvalidOperationException(
@@ -139,12 +144,15 @@ public static class JxConversion
         return ReadNumberNode(reader);
       case "true":
         reader.Skip();
+        TraceReader(reader);
         return new JValue(true);
       case "false":
         reader.Skip();
+        TraceReader(reader);
         return new JValue(false);
       case "null":
         reader.Skip();
+        TraceReader(reader);
         return JValue.CreateNull();
       case "list":
         return ReadListNode(reader);
@@ -165,6 +173,7 @@ public static class JxConversion
   private static JValue ReadStringNode(XmlReader reader)
   {
     var text = reader.ReadElementContentAsString("str", JxSmolnNamespace);
+    TraceReader(reader);
     return JValue.CreateString(text);
   }
 
@@ -177,6 +186,7 @@ public static class JxConversion
   private static JValue ReadNumberNode(XmlReader reader)
   {
     var text = reader.ReadElementContentAsString("num", JxSmolnNamespace);
+    TraceReader(reader);
     if(Int64.TryParse(text, CultureInfo.InvariantCulture, out var result))
     {
       return new JValue(result);
@@ -203,14 +213,17 @@ public static class JxConversion
     if(reader.IsEmptyElement)
     {
       reader.Read();
+      TraceReader(reader);
       return list;
     }
     while(reader.Read())
     {
       reader.MoveToContent();
+      TraceReader(reader);
       if(reader.NodeType == XmlNodeType.EndElement)
       {
-        reader.Read();
+        //reader.Read();
+        //TraceReader(reader);
         return list;
       }
       if(reader.NodeType == XmlNodeType.Element)
@@ -239,14 +252,18 @@ public static class JxConversion
     if(reader.IsEmptyElement)
     {
       reader.Read();
+      TraceReader(reader);
       return ob;
     }
     while(reader.Read())
     {
+      //TraceReader(reader);
       reader.MoveToContent();
+      TraceReader(reader);
       if(reader.NodeType == XmlNodeType.EndElement)
       {
-        reader.Read();
+        //reader.Read();
+        //TraceReader(reader);
         return ob;
       }
       if(!reader.IsStartElement("prop", JxSmolnNamespace))
@@ -284,15 +301,34 @@ public static class JxConversion
         $"Duplicate property name '{name}'");
     }
     reader.Read();
+    TraceReader(reader);
     var value = ReadJsonFromXml(reader);
     reader.MoveToContent();
+    TraceReader(reader);
     if(reader.NodeType != XmlNodeType.EndElement)
     {
       throw new InvalidOperationException(
         $"Expecting </j:prop> after <j:prop>'s content");
     }
-    reader.Read();
+    //reader.Read();
+    //TraceReader(reader);
     ob.Add(name, value);
   }
+
+  private static void TraceReader(
+    XmlReader reader,
+    [CallerLineNumber] int lineNumber = 0,
+    [CallerMemberName] string? caller = null)
+  {
+    if(ReaderTracer!=null)
+    {
+      ReaderTracer(reader, lineNumber, caller ?? "???");
+    }
+  }
+  
+  /// <summary>
+  /// A delegate that, if set, is spammed with callbacks whenever the XML source advances
+  /// </summary>
+  public static Action<XmlReader, int, string>? ReaderTracer { get; set; }
 }
 
