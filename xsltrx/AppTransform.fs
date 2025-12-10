@@ -6,8 +6,11 @@ open System.Xml
 open System.Xml.XPath
 open System.Xml.Xsl
 
-open Mvp.Xml.Exslt
 open Mvp.Xml.Common.Xsl
+
+open Newtonsoft.Json
+
+open TteLcl.JxSmoln
 
 open ColorPrint
 open CommonTools
@@ -27,11 +30,19 @@ type private Transformation = {
   LoadedTransform: MvpXslTransform
 }
 
+type private JsonFormat =
+  | NotJson
+  | Indented
+  | Flat
+  // | MultiIndented
+  // | MultiFlat
+
 type private Options = {
   Stylesheets: string list
   EnableDocumentFunction: bool
   InOutPairs: InputOutput list
   OutputDerivations: OutputDerivation list
+  JsonMode: JsonFormat
 }
 
 let private tryParseDerivation (derivation: string) =
@@ -56,6 +67,42 @@ let private tryDeriveOutput derivations input =
   |> Seq.choose (tryDerive input)
   |> Seq.tryHead
 
+let private diagnostic (filename:string) (xr: XmlReader) =
+  cp $"\foWriting diagnostic dump \fr{filename}\f0."
+  let xws = new XmlWriterSettings()
+  xws.CloseOutput <- true
+  xws.Indent <- true
+  use xw = XmlWriter.Create(filename, xws)
+  xw.WriteNode(xr, true)
+  failwith "Aborting after writing diagnostic file"
+
+let private emitJson mode filename xrdr =
+  xrdr |> diagnostic "diag.xml"
+  let isMulti =
+    match mode with
+    | JsonFormat.NotJson ->
+      failwith "Internal error: expecting a JSON mode, not 'NotJson'"
+    | JsonFormat.Flat -> false
+    | JsonFormat.Indented -> false
+  let isIndented =
+    match mode with
+    | JsonFormat.NotJson ->
+      failwith "Internal error: expecting a JSON mode, not 'NotJson'"
+    | JsonFormat.Flat -> false
+    | JsonFormat.Indented -> true
+  let formatting =
+    // Explicit namespace to avoid any confusion between Newtonsoft.Json.Formatting and System.Xml.Formatting
+    if isIndented then Newtonsoft.Json.Formatting.Indented else Newtonsoft.Json.Formatting.None
+  if isMulti then
+    failwith "Multi-JSON conversion NYI"
+  else
+    let node = xrdr |> JxConversion.ReadJsonFromXml
+    do
+      let json = JsonConvert.SerializeObject(node, formatting)
+      use w = filename |> startFile
+      w.WriteLine(json) // TODO: should this be suppressed for Flat format?
+    filename |> finishFile
+
 let private runTransform o =
   // see also https://github.com/devlooped/Mvp.Xml/blob/main/src/Mvp.Xml/Exslt/Xsl/MvpXslTransform.cs
   
@@ -74,6 +121,7 @@ let private runTransform o =
     cp $"Loading stylesheet \fb{xsltFile}\f0."
     transformloader trx xsltFile
     trx
+  let jsonOutput = o.JsonMode <> JsonFormat.NotJson
   let stylesheets = o.Stylesheets
   let pipeline =
     stylesheets
@@ -83,7 +131,14 @@ let private runTransform o =
     match transformList with
     | trx :: [] ->
       let om = trx.LoadedTransform.OutputSettings.OutputMethod
-      om |> Some
+      if jsonOutput then
+        if om <> XmlOutputMethod.Xml then
+          cp $"\frError: When using JSON output, the final stylesheet must have output method 'XML', but got '\fb{om}\fr' in \f0'\fc{trx.XsltFile}\f0'."
+          None
+        else
+          om |> Some
+      else
+        om |> Some
     | trx :: rest ->
       let outputMethod = trx.LoadedTransform.OutputSettings.OutputMethod
       if outputMethod <> XmlOutputMethod.Xml then
@@ -101,10 +156,14 @@ let private runTransform o =
     1
   | Some(lastOutputMethod) ->
     let defaultExtension =
-      match lastOutputMethod with
-      | XmlOutputMethod.Text -> ".txt"
-      | XmlOutputMethod.Html -> ".html"
-      | _ -> ".out.xml" // avoid overwriting input, which most likely already has extension ".xml"
+      match o.JsonMode with
+      | JsonFormat.NotJson ->
+        match lastOutputMethod with
+        | XmlOutputMethod.Text -> ".txt"
+        | XmlOutputMethod.Html -> ".html"
+        | _ -> ".out.xml" // avoid overwriting input, which most likely already has extension ".xml"
+      | JsonFormat.Indented -> ".json"
+      | JsonFormat.Flat -> ".json"
     let resolveOutput pair =
       if pair.Output |> String.IsNullOrEmpty then
         let input = pair.Input |> Path.GetFileName
@@ -128,22 +187,31 @@ let private runTransform o =
       cp $"  Applying intermediate transform \fc{trx.XsltFile}\f0."
       let arglist = new XsltArgumentList()
       let xout = trx.LoadedTransform.Transform(xin, arglist, false, 256 (* that's the default *))
-      new XmlInput(xout)
+      xout
     let transformLast trx outname (xin:XmlInput) =
       cp $"  Applying final transform \fc{trx.XsltFile}\f0 (mode \fb{trx.LoadedTransform.OutputSettings.OutputMethod}\f0)."
       let arglist = new XsltArgumentList()
-      // PLACEHOLDER!
       do
         use tw = outname |> startFile
         let xout = new XmlOutput(tw)
         trx.LoadedTransform.Transform(xin, arglist, xout) |> ignore
       outname |> finishFile
+    let transformJson outname (xrdr:XmlReader) =
+      cp $"  Converting to JSON (format '\fg{o.JsonMode}\f0')"
+      xrdr |> emitJson o.JsonMode outname
+    let transformJsonLast trx outname (xin:XmlInput) =
+      let xout = xin |> transformIntermediate trx
+      xout |> transformJson outname
     let rec transformPipeline outname xin pipeline =
       match pipeline with
       | trx :: [] ->
-        xin |> transformLast trx outname
+        if jsonOutput then
+          xin |> transformJsonLast trx outname
+        else
+          xin |> transformLast trx outname
       | trx :: remainder ->
-        let xin2 = xin |> transformIntermediate trx
+        let xout = xin |> transformIntermediate trx
+        let xin2 = new XmlInput(xout)
         remainder |> transformPipeline outname xin2
       | [] ->
         failwith "Not expecting an empty pipeline here"
@@ -154,13 +222,6 @@ let private runTransform o =
       let doc = new XPathDocument(input)
       let xin = new XmlInput(doc)
       pipeline |> transformPipeline output xin
-      //do
-      //  use tw = output |> startFile
-      //  let arglist = new XsltArgumentList()
-      //  let input = new XmlInput(doc)
-      //  let output = new XmlOutput(tw)
-      //  transform.Transform(input, arglist, output) |> ignore
-      //output |> finishFile
     0
 
 let run args =
@@ -197,6 +258,16 @@ let run args =
       | None -> None
       | Some(d) ->
         rest |> parseMore {o with OutputDerivations = d :: o.OutputDerivations}
+    | "-json" :: rest ->
+      rest |> parseMore {o with JsonMode = JsonFormat.Indented}
+    | "-json-flat" :: rest ->
+      rest |> parseMore {o with JsonMode = JsonFormat.Flat}
+    | "-mjson" :: rest ->
+      cp "\frNot yet implemented: \fy-mjson\f0."
+      None
+    | "-jsonl" :: rest ->
+      cp "\frNot yet implemented: \fy-jsonl\f0."
+      None
     | [] ->
       if o.Stylesheets |> List.isEmpty then
         cp "\foNo stylesheet file (\fg-s\fo) given\f0."
@@ -214,6 +285,7 @@ let run args =
     InOutPairs = []
     EnableDocumentFunction = false
     OutputDerivations = []
+    JsonMode = JsonFormat.NotJson
   }
   match oo with
   | Some(o) ->

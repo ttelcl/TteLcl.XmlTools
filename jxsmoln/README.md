@@ -25,7 +25,7 @@ These are the elements in a JXSMOLN:
 | `<j:false/>` | A `false` literal |
 | `<j:str>TEXT</j:str>` | A JSON string `"TEXT"` |
 | `<j:num>NUMBER</j:num>` | A JSON numeric value (integer or real) |
-| `<j:mjson>...</j:mjson>` | Only valid as root element, indicating the content is <BR/>multi-JSON rather than normal JSON |
+| `<j:multi>...</j:multi>` | Only valid as root element, indicating the content is <BR/>multi-JSON rather than normal JSON |
 
 Example:
 ```xml

@@ -58,7 +58,7 @@ public static class JxConversion
         throw new InvalidOperationException(
           $"Incorrect namespace in node. Expecting the jxsmoln namespace, but got '{reader.NamespaceURI}'");
       }
-      if(ln == "mjson")
+      if(ln == "multi")
       {
         if(!reader.IsEmptyElement) // else return nothing
         {
@@ -78,7 +78,7 @@ public static class JxConversion
             else
             {
               throw new InvalidOperationException(
-                $"Unexpected content in <j:mjson> element. Expecting elements, but found a '{reader.NodeType}'");
+                $"Unexpected content in <j:multi> element. Expecting elements, but found a '{reader.NodeType}'");
             }
           }
         }
@@ -121,10 +121,10 @@ public static class JxConversion
       throw new InvalidOperationException(
         $"Incorrect namespace in node. Expecting the jxsmoln namespace, but got '{reader.NamespaceURI}'");
     }
-    if(ln == "mjson")
+    if(ln == "multi")
     {
       throw new InvalidOperationException(
-        $"Encountered an 'mjson' element at an invalid position. Multi-json is not supported here.");
+        $"Encountered a 'multi' element at an invalid position. Multi-json is not supported here.");
     }
     if(ln == "prop")
     {
