@@ -173,7 +173,7 @@ public static class JxConversion
   private static JValue ReadStringNode(XmlReader reader)
   {
     var text = reader.ReadElementContentAsString("str", JxSmolnNamespace);
-    TraceReader(reader);
+    TraceReader(reader, $"string value == '{text}'");
     return JValue.CreateString(text);
   }
 
@@ -219,13 +219,19 @@ public static class JxConversion
     while(reader.Read())
     {
       reader.MoveToContent();
-      TraceReader(reader);
       if(reader.NodeType == XmlNodeType.EndElement)
       {
-        //reader.Read();
-        //TraceReader(reader);
+        TraceReader(reader, "end of list (v1)");
+        if(reader.LocalName != "list")
+        {
+          throw new InvalidOperationException(
+            $"Expecting <j:list> content to be closed by </j:list> but found closer </{reader.Name}>");
+        }
+        reader.Read();
+        TraceReader(reader, "Skipped over </j:list>");
         return list;
       }
+      TraceReader(reader, "start of list item");
       if(reader.NodeType == XmlNodeType.Element)
       {
         var item = ReadJsonFromXml(reader);
@@ -235,6 +241,13 @@ public static class JxConversion
       {
         throw new InvalidOperationException(
           $"Unexpected content in <j:list> element. Expecting elements, but found a '{reader.NodeType}'");
+      }
+      if(reader.NodeType == XmlNodeType.EndElement && reader.LocalName != "list")
+      {
+        TraceReader(reader, "end of list (v2)");
+        reader.Read();
+        TraceReader(reader, "Skipped over </j:list> (v2)");
+        return list;
       }
     }
     throw new InvalidOperationException(
@@ -259,13 +272,19 @@ public static class JxConversion
     {
       //TraceReader(reader);
       reader.MoveToContent();
-      TraceReader(reader);
       if(reader.NodeType == XmlNodeType.EndElement)
       {
-        //reader.Read();
-        //TraceReader(reader);
+        TraceReader(reader, "end of object");
+        if(reader.LocalName != "ob")
+        {
+          throw new InvalidOperationException(
+            $"Expecting <j:ob> content to be closed by </j:ob> but found closer </{reader.Name}>");
+        }
+        reader.Read();
+        TraceReader(reader, "Skipped over </j:ob>");
         return ob;
       }
+      TraceReader(reader, "more object content");
       if(!reader.IsStartElement("prop", JxSmolnNamespace))
       {
         throw new InvalidOperationException(
@@ -300,15 +319,16 @@ public static class JxConversion
       throw new InvalidOperationException(
         $"Duplicate property name '{name}'");
     }
+    TraceReader(reader, $"key = '{name}'");
     reader.Read();
-    TraceReader(reader);
+    TraceReader(reader, $"moved to start of content for '{name}'");
     var value = ReadJsonFromXml(reader);
     reader.MoveToContent();
-    TraceReader(reader);
-    if(reader.NodeType != XmlNodeType.EndElement)
+    TraceReader(reader, $"finished reading property '{name}'");
+    if(reader.NodeType != XmlNodeType.EndElement || reader.LocalName != "prop")
     {
       throw new InvalidOperationException(
-        $"Expecting </j:prop> after <j:prop>'s content");
+        $"Expecting </j:prop> after <j:prop key='{name}'>'s content");
     }
     //reader.Read();
     //TraceReader(reader);
@@ -317,18 +337,19 @@ public static class JxConversion
 
   private static void TraceReader(
     XmlReader reader,
+    string? message = null,
     [CallerLineNumber] int lineNumber = 0,
     [CallerMemberName] string? caller = null)
   {
     if(ReaderTracer!=null)
     {
-      ReaderTracer(reader, lineNumber, caller ?? "???");
+      ReaderTracer(reader, message, lineNumber, caller ?? "???");
     }
   }
   
   /// <summary>
   /// A delegate that, if set, is spammed with callbacks whenever the XML source advances
   /// </summary>
-  public static Action<XmlReader, int, string>? ReaderTracer { get; set; }
+  public static Action<XmlReader, string?, int, string>? ReaderTracer { get; set; }
 }
 

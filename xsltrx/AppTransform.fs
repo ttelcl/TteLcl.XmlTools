@@ -53,12 +53,18 @@ type private Options = {
 }
 
 // Debug utility for JsonConversion
-let private traceJson (reader: XmlReader) (line: int) (caller: string) =
+let private traceJson (reader: XmlReader) (message: string) (line: int) (caller: string) =
   cpx $"\fb{line,4}\fo:\fw{caller,-20} \fg{reader.NodeType,-12}\f0 "
   match reader.NodeType with
-  | XmlNodeType.Element -> cpx $"\fo<\fc{reader.Name}\fo>\f0"
+  | XmlNodeType.Element ->
+    if reader.IsEmptyElement then
+      cpx $"\fr<\fc{reader.Name}\fr/>\f0"
+    else
+      cpx $"\fo<\fc{reader.Name}\fo>\f0"
   | XmlNodeType.EndElement -> cpx $"\fo</\fc{reader.Name}\fo>\f0"
   | _ -> cpx $"'\fy{reader.Name}\f0'"
+  if message |> String.IsNullOrEmpty |> not then
+    cpx $"\t\f0(\fy{message}\f0)"
   cp ""
 
 let private tryParseDerivation (derivation: string) =
@@ -231,7 +237,7 @@ let private runTransform o =
     let transformJson outname (xrdr:XmlReader) =
       cp $"  Converting to JSON (format '\fg{o.JsonMode}\f0')"
       if o.TraceJson then
-        JxConversion.ReaderTracer <- (fun rdr line caller -> traceJson rdr line caller)
+        JxConversion.ReaderTracer <- (fun rdr message line caller -> traceJson rdr message line caller)
       xrdr |> emitJson o.JsonMode outname
     let transformJsonLast trx outname (xin:XmlInput) =
       let xout = xin |> transformIntermediate trx
