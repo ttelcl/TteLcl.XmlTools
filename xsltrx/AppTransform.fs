@@ -102,11 +102,11 @@ let cacheReader (xrdr:XmlReader) =
   new XPathDocument(xrdr)
 
 let private emitJson mode filename xrdr =
-  // The XmlReader produced by MvpXslTransform.Transform and the one taken by
-  // JxConversion.ReadJsonFromXml disagree on their expectations for behaviour.
-  // As a hack, materialize the XML document first
-  let doc = xrdr |> cacheReader
-  let xrdr = doc.CreateNavigator().ReadSubtree()
+  //// The XmlReader produced by MvpXslTransform.Transform and the one taken by
+  //// JxConversion.ReadJsonFromXml disagree on their expectations for behaviour.
+  //// As a hack, materialize the XML document first
+  //let doc = xrdr |> cacheReader
+  //let xrdr = doc.CreateNavigator().ReadSubtree()
   let isMulti =
     match mode with
     | JsonFormat.NotJson ->
