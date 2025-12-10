@@ -45,7 +45,7 @@ public static class JxConversion
   public static IEnumerable<JToken> ReadMultiJsonFromXml(XmlReader reader)
   {
     var kind = reader.MoveToContent();
-    TraceReader(reader);
+    TraceReader(reader, "looking for multi-json node");
     if(kind != XmlNodeType.None) // else return nothing
     {
       if(kind != XmlNodeType.Element)
@@ -64,28 +64,28 @@ public static class JxConversion
       {
         if(!reader.IsEmptyElement) // else return nothing
         {
-          while(reader.Read())
+          reader.Read();
+          reader.MoveToContent();
+          while(reader.IsStartElement())
           {
+            TraceReader(reader, "start of multi-json item");
+            var item = ReadJsonFromXml(reader);
             reader.MoveToContent();
-            TraceReader(reader);
-            if(reader.NodeType == XmlNodeType.EndElement)
-            {
-              reader.Read();
-              TraceReader(reader);
-              break; // we're done
-            }
-            if(reader.NodeType == XmlNodeType.Element)
-            {
-              var item = ReadJsonFromXml(reader);
-              reader.MoveToContent();
-              yield return item;
-            }
-            else
-            {
-              throw new InvalidOperationException(
-                $"Unexpected content in <j:multi> element. Expecting elements, but found a '{reader.NodeType}'");
-            }
+            yield return item;
           }
+          TraceReader(reader, "leaving multi-json content");
+          if(reader.NodeType != XmlNodeType.EndElement)
+          {
+            throw new InvalidOperationException(
+              $"Unexpected node type inside <j:multi>: '{reader.NodeType}'");
+          }
+          if(reader.LocalName != "multi")
+          {
+            throw new InvalidOperationException(
+              $"Unexpected end-of-element node inside <j:multi>: </{reader.Name}>");
+          }
+          reader.Skip();
+          TraceReader(reader, $"completed <j:multi>, and moved beyond");
         }
       }
       else
@@ -94,6 +94,7 @@ public static class JxConversion
         // Do not consider this an error, just return that node
         var node = ReadJsonFromXml(reader);
         reader.MoveToContent();
+        TraceReader(reader, "completed the single item as if in a multi-json list");
         yield return node;
       }
     }
