@@ -177,9 +177,15 @@ public static class JxConversion
   /// '<see cref="JsonToken.None"/>' state
   /// </param>
   /// <param name="writer"></param>
+  /// <param name="multiJson"></param>
   /// <exception cref="InvalidOperationException"></exception>
-  public static void WriteJsonToXmlDocument(JsonReader reader, XmlWriter writer)
+  public static void WriteJsonToXmlDocument(JsonReader reader, XmlWriter writer, bool multiJson)
   {
+    if(multiJson)
+    {
+      throw new NotImplementedException(
+        "multi-json support is not yet implemented");
+    }
     writer.WriteStartDocument();
     if(reader.TokenType != JsonToken.None)
     {

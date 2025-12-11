@@ -7,8 +7,9 @@ open ColorPrint
 let usage command =
   cp "\foConvert between JSON and JXSMOLN\f0"
   cp ""
-  cp "\fojxsmoln \fg-j \fcfile.json\f0 [\fg-o \fcfile.xml\f0]"
+  cp "\fojxsmoln \fg-j \fcfile.json\f0 [\fg-o \fcfile.xml\f0] [\fg-mjson\f0]"
   cp "   Convert JSON to JXSMOLN"
+  cp "   \fg-mjson\f0\fx          Read input as *.mjson (even if the extension is not *.mjson or *.jsonl)"
   cp ""
   cp "\fojxsmoln \fg-x \fcfile.xml\f0 [\fg-o \fcfile.json\f0] [\fg-indent \fo0\f0|\fg-indent \fcspaces\f0]] [\fg-trace\f0]"
   cp "   Convert JXSMOLN to JSON."

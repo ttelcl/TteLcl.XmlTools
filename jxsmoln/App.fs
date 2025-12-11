@@ -2,6 +2,7 @@
 
 open System
 open System.IO
+open System.Text
 open System.Xml
 open System.Xml.XPath
 open System.Xml.Xsl
@@ -13,8 +14,12 @@ open TteLcl.JxSmoln
 open ColorPrint
 open CommonTools
 
+type JsonMultiMode =
+  | Single
+  | Multiple
+
 type private ConversionJob =
-  | JsonToXml of JsonIn: string * XmlOut: string
+  | JsonToXml of JsonIn: string * XmlOut: string * MultMode: JsonMultiMode
   | XmlToJson of XmlIn: string * JsonOut: string
 
 type private Options = {
@@ -38,9 +43,34 @@ let traceJson (reader: XmlReader) (message: string) (line: int) (caller: string)
     cpx $"\t\f0(\fy{message}\f0)"
   cp ""
 
-let private convertJsonToXml o jsonIn xmlOut =
-  cp "\frNot Yet Implemented!\f0 (json to xml)"
-  1
+let private modeFromExtension (jsonfile:string) =
+  let extension = (jsonfile |> Path.GetExtension).ToLowerInvariant()
+  match extension with
+  | ".json" -> JsonMultiMode.Single
+  | ".mjson" -> JsonMultiMode.Multiple
+  | ".jsonl" -> JsonMultiMode.Multiple
+  | _ -> JsonMultiMode.Single
+
+let private convertJsonToXml o mode jsonIn xmlOut =
+  let xmlOut =
+    if xmlOut |> String.IsNullOrEmpty then
+      Path.ChangeExtension(jsonIn, ".out.xml")
+    else
+      xmlOut
+  do
+    use jrdr = new JsonTextReader(File.OpenText(jsonIn))
+    if mode = JsonMultiMode.Multiple then
+      jrdr.SupportMultipleContent <- true
+    jrdr.DateParseHandling <- DateParseHandling.None
+    jrdr.FloatParseHandling <- FloatParseHandling.Double
+    cp $"Writing \fg{xmlOut}\f0."
+    let settings = new XmlWriterSettings()
+    settings.Indent <- true
+    settings.Encoding <- new UTF8Encoding(false) // do not emit BOM
+    use xw = XmlTextWriter.Create(xmlOut + ".tmp", settings)
+    JxConversion.WriteJsonToXmlDocument(jrdr, xw, (mode = JsonMultiMode.Multiple))
+  xmlOut |> finishFile
+  0
 
 let private convertXmlToJson o xmlIn jsonOut =
   if o.TraceJson then
@@ -66,10 +96,10 @@ let private convertXmlToJson o xmlIn jsonOut =
   jsonOut |> finishFile
   0
 
-let private runConversion o conversion =
+let private runConversion (o:Options) conversion =
   match conversion with
-  | JsonToXml (jsonIn, xmlOut) ->
-    convertJsonToXml o jsonIn xmlOut
+  | JsonToXml (jsonIn, xmlOut, mode) ->
+    convertJsonToXml o mode jsonIn xmlOut
   | XmlToJson (xmlIn, jsonOut) ->
     convertXmlToJson o xmlIn jsonOut
 
@@ -87,7 +117,7 @@ let run args =
     | "-h" :: _ ->
       None
     | "-j" :: jsonFile :: rest ->
-      let job = ConversionJob.JsonToXml(jsonFile, null)
+      let job = ConversionJob.JsonToXml(jsonFile, null, jsonFile |> modeFromExtension)
       rest |> parseMore {o with Jobs = job :: o.Jobs}
     | "-x" :: xmlFile :: rest ->
       let job = ConversionJob.XmlToJson(xmlFile, null)
@@ -96,8 +126,8 @@ let run args =
       rest |> parseMore {o with TraceJson = true}
     | "-o" :: outfile :: rest ->
       match o.Jobs with
-      | JsonToXml(json, _) :: jobs ->
-        let job = JsonToXml(json, outfile)
+      | JsonToXml(json, _, mode) :: jobs ->
+        let job = JsonToXml(json, outfile, mode)
         rest |> parseMore {o with Jobs = job :: jobs}
       | XmlToJson(xml, _) :: jobs ->
         let job = XmlToJson(xml, outfile)
