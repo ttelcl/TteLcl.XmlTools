@@ -11,6 +11,7 @@ open Mvp.Xml.Common.Xsl
 open Newtonsoft.Json
 
 open TteLcl.JxSmoln
+open TteLcl.XsltExtensionFunctions
 
 open ColorPrint
 open CommonTools
@@ -132,6 +133,11 @@ let private emitJson mode filename xrdr =
       w.WriteLine(json) // TODO: should this be suppressed for Flat format?
     filename |> finishFile
 
+let private initArgumentList o =
+  let arglist = new XsltArgumentList()
+  SegmentFunctions.AddExtensionObject(arglist)
+  arglist
+
 let private runTransform o =
   // see also https://github.com/devlooped/Mvp.Xml/blob/main/src/Mvp.Xml/Exslt/Xsl/MvpXslTransform.cs
   
@@ -218,7 +224,7 @@ let private runTransform o =
     let pairs = o.InOutPairs |> List.map resolveOutput
     let transformIntermediate trx (xin:XmlInput) =
       cp $"  Applying intermediate transform \fc{trx.XsltFile}\f0."
-      let arglist = new XsltArgumentList()
+      let arglist = o |> initArgumentList
       let xout = trx.LoadedTransform.Transform(xin, arglist, false, 256 (* that's the default *))
       if trx.DiagnosticAbort then
         let diagname = Path.ChangeExtension(Path.GetFileName(trx.XsltFile), ".diag.xml")
@@ -228,7 +234,7 @@ let private runTransform o =
       cp $"  Applying final transform \fc{trx.XsltFile}\f0 (mode \fb{trx.LoadedTransform.OutputSettings.OutputMethod}\f0)."
       if trx.DiagnosticAbort then
         cp "  (\frIgnoring \fg-diag\fr for final transform stage\f0)"
-      let arglist = new XsltArgumentList()
+      let arglist = o |> initArgumentList
       do
         use tw = outname |> startFile
         let xout = new XmlOutput(tw)

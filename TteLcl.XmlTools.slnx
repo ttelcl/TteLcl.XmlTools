@@ -5,6 +5,7 @@
   </Folder>
   <Folder Name="/Libraries/">
     <Project Path="TteLcl.JxSmoln/TteLcl.JxSmoln.csproj" Id="241b9b70-3f67-4ed1-8ecb-6e74f8def1db" />
+    <Project Path="TteLcl.XsltExtensionFunctions/TteLcl.XsltExtensionFunctions.fsproj" Id="6ee01301-9977-4fc8-bc20-ed35873c7e9c" />
   </Folder>
   <Folder Name="/Solution Items/">
     <File Path=".gitignore" />

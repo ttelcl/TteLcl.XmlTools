@@ -29,6 +29,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\TteLcl.JxSmoln\TteLcl.JxSmoln.csproj" />
+    <ProjectReference Include="..\TteLcl.XsltExtensionFunctions\TteLcl.XsltExtensionFunctions.fsproj" />
   </ItemGroup>
 
   <ItemGroup>
