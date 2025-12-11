@@ -135,6 +135,18 @@ let run args =
       | [] ->
         cp "\frExpecting a \fg-j\fr or \fg-x\fr before the first \fg-o\f0."
         None
+    | "-mjson" :: rest
+    | "-multi" :: rest ->
+      match o.Jobs with
+      | JsonToXml(json, outfile, _) :: jobs ->
+        let job = JsonToXml(json, outfile, JsonMultiMode.Multiple)
+        rest |> parseMore {o with Jobs = job :: jobs}
+      | XmlToJson(xml, _) :: jobs ->
+        cp "\frNot yet supported: \fg-mjson\fr for xml-to-json (\fg-x\fr) conversions\f0."
+        None
+      | [] ->
+        cp "\frExpecting a \fg-j\fr or \fg-x\fr before the first \fg-mjson\f0."
+        None
     | "-indent" :: spaces :: rest ->
       let ok, spaceCount = spaces |> Int32.TryParse
       if ok && spaceCount >= 0 then

@@ -181,27 +181,37 @@ public static class JxConversion
   /// <exception cref="InvalidOperationException"></exception>
   public static void WriteJsonToXmlDocument(JsonReader reader, XmlWriter writer, bool multiJson)
   {
+    writer.WriteStartDocument();
     if(multiJson)
     {
-      throw new NotImplementedException(
-        "multi-json support is not yet implemented");
+      writer.WriteStartElement("j", "multi", JxSmolnNamespace);
+      if(reader.Read())
+      {
+        while(WriteJsonItem(reader, writer))
+        {
+          // everything is done in WriteJsonItem()
+        }
+      }
+      writer.WriteEndElement();
     }
-    writer.WriteStartDocument();
-    if(reader.TokenType != JsonToken.None)
+    else
     {
-      throw new InvalidOperationException(
-        "Expecting a new JsonReader (in state 'None')");
-    }
-    if(!reader.Read())
-    {
-      throw new InvalidOperationException(
-        "Not expecting an empty JsonReader");
-    }
-    var result = WriteJsonItem(reader, writer);
-    if(result)
-    {
-      throw new InvalidOperationException(
-        $"Expecting EOF but found {reader.TokenType}");
+      if(reader.TokenType != JsonToken.None)
+      {
+        throw new InvalidOperationException(
+          "Expecting a new JsonReader (in state 'None')");
+      }
+      if(!reader.Read())
+      {
+        throw new InvalidOperationException(
+          "Not expecting an empty JsonReader");
+      }
+      var result = WriteJsonItem(reader, writer);
+      if(result)
+      {
+        throw new InvalidOperationException(
+          $"Expecting EOF but found {reader.TokenType}");
+      }
     }
     writer.WriteEndDocument();
   }
