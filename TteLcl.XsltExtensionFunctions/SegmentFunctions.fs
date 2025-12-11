@@ -7,6 +7,19 @@ open System.Xml.Xsl
 /// Container class for XSLT extension functions, suitable for use as extension object.
 type public SegmentFunctions () =
   
+  /// The XML namespace URI used to register XSL extension functions implemented in this class
+  static member public NamespaceUri
+    with get() =
+      "urn:ttelcl:xsltextensionfunctions:segment"
+
+  /// <summary>Create an instance of this class and register it as an extension object
+  /// in <paramref name="arglist"/>, using the namespace <see cref="NamespaceUri"/>
+  /// </summary>
+  static member public AddExtensionObject(arglist: XsltArgumentList): unit =
+    // Remove existing mapping if it exists
+    arglist.RemoveExtensionObject(SegmentFunctions.NamespaceUri) |> ignore
+    arglist.AddExtensionObject(SegmentFunctions.NamespaceUri, new SegmentFunctions())
+  
   /// <summary>
   /// Split <paramref name="text"/> using the given <paramref name="separator"/> into one or
   /// more segments and return the segment index by <paramref name="index"/>. The index is
@@ -24,13 +37,26 @@ type public SegmentFunctions () =
     else
       parts[parts.Length + index]
   
-  static member public NamespaceUri
-    with get() =
-      "urn:ttelcl:xsltextensionfunctions:segment"
-
-  static member public AddExtensionObject(arglist: XsltArgumentList): unit =
-    // Remove existing mapping if it exists
-    arglist.RemoveExtensionObject(SegmentFunctions.NamespaceUri) |> ignore
-    arglist.AddExtensionObject(SegmentFunctions.NamespaceUri, new SegmentFunctions())
+  /// <summary>
+  /// Split <paramref name="text"/> using the given <paramref name="separator"/> into one or
+  /// more segments. Recombine the first <paramref name="count"/> of those segments and return it.
+  /// If <paramref name="count"/> is negative then recombine all except the final 
+  /// <paramref name="count"/> segments.
+  /// </summary>  
+  member public this.``segment-head``( text:string, separator:string, count:int ) : string =
+    if count = 0 then
+      new ArgumentException("Expecting a count other than 0") |> raise
+    let parts = text.Split(separator)
+    if count > 0 then
+      if count >= parts.Length then
+        text
+      else
+        String.Join(separator, parts |> Array.take count)
+    else
+      let count = count + parts.Length
+      if count <= 0 then
+        ""
+      else
+        String.Join(separator, parts |> Array.take count)
 
 //
