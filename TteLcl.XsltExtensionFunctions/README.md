@@ -110,3 +110,36 @@ element with `<folder>` and `<name>` children. If there is no folder
 If there is no name (the name ends with a path separator), the `<name>` child
 is omitted.
 
+### fsfn:files-in-folder($folder, $mask, $suffix)
+
+`files-in-folder(string folder, string mask, string suffix)`
+`files-in-folder(string folder, string mask)`
+`files-in-folder(string folder)`
+
+Returns a list of elements describing files in the specified folder. If
+`mask` is provided (e.g. `*.xml`), it is used to limit the files returned to
+files matching that glob expression. Providing `suffix` has two effects:
+first, it further limits the files to ones whose name ends with the suffix string.
+second, it adds an extra attribute to each returned file element named `tag` that
+contains the file name with that suffix removed.
+
+The returned elements have the name `<file>` and contain the file's path (including
+the `folder` provided in the call) as well as the following attributes:
+
+* `path` - the path to the file (a copy of the `folder` provided to the call)
+* `name` - the name of the file without the path
+* `tag` - only present if a non-empty `suffix` was given in the call: `name` with
+  the `suffix` removed
+
+
+#### Example
+
+```
+Call:
+fsfn:files-in-folder('datafolder', '*.xml', 'Setting.xml')
+
+Result:
+<file tag="One" name="OneSetting.xml" path="datafolder">datafolder\OneSetting.xml</file>
+<file tag="Two" name="TwoSetting.xml" path="datafolder">datafolder\TwoSetting.xml</file>
+```
+

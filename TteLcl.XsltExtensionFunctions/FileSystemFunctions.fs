@@ -88,3 +88,40 @@ type public FileSystemFunctions () =
   member public this.``path-combine``( path1:string, path2:string, path3:string, path4:string ) : string =
     Path.Combine(path1, path2, path3, path4)
 
+  member public this.``files-in-folder``( folder:string, mask:string, suffix:string ) : XPathNodeIterator =
+    let host = new XmlDocument()
+    host.LoadXml("<files/>")
+    let root = host.DocumentElement
+    let di = new DirectoryInfo(folder)
+    let files =
+      if mask |> String.IsNullOrEmpty then
+        di.GetFiles()
+      else
+        di.GetFiles(mask)
+    let files =
+      if suffix |> String.IsNullOrEmpty then
+        files
+      else
+        files
+        |> Array.filter (fun fi -> fi.Name.EndsWith(suffix, StringComparison.InvariantCulture))
+    for fi in files do
+      let e = host.CreateElement("file")
+      if suffix |> String.IsNullOrEmpty |> not then
+        let tag = fi.Name.Substring(0, fi.Name.Length - suffix.Length)
+        e.SetAttribute("tag", tag)
+      e.SetAttribute("name", fi.Name)
+      // e.SetAttribute("stem", fi.Name |> Path.GetFileNameWithoutExtension)
+      // e.SetAttribute("ext", fi.Extension)
+      e.SetAttribute("path", folder)
+      e.InnerText <- Path.Combine(folder, fi.Name)
+      root.AppendChild(e) |> ignore
+    host.CreateNavigator().Select("/files/*")
+
+  member public this.``files-in-folder``( folder:string, mask:string ) : XPathNodeIterator =
+    this.``files-in-folder``( folder, mask, null)
+
+  member public this.``files-in-folder``( folder:string ) : XPathNodeIterator =
+    this.``files-in-folder``( folder, null, null)
+
+
+
