@@ -37,6 +37,9 @@ type public SegmentFunctions () =
     else
       parts[parts.Length + index]
   
+  member public this.``segment-get``( text:string, separator:string, index:int ) : string =
+    this.``get-segment``(text, separator, index)
+
   /// <summary>
   /// Split <paramref name="text"/> using the given <paramref name="separator"/> into one or
   /// more segments. Recombine the first <paramref name="count"/> of those segments and return it.

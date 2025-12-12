@@ -10,16 +10,18 @@ of F# (as an example: unlike C#, F# can declare a method named 'get-segment()')
 
 XSL extension functions in the namespace `urn:ttelcl:xslt-extension-functions:segment`:
 
-### get-segment
-`get-segment(string text, string separator, int index)`
+### segment-get
+`segment-get(string text, string separator, int index)`
+
+_Alias:_ `get-segment(string text, string separator, int index)`
 
 Split `text` into one or more segments using the `separator`. Return the segment at
 `index` (1-based indexing). If `index` is negative count from the end instead of the start.
 
 #### Examples
 ```
-get-segment('path\to\a\file.txt', '\', 1) -> 'path'
-get-segment('path\to\a\file.txt', '\', -1) -> 'file.txt'
+segment-get('path\to\a\file.txt', '\', 1) -> 'path'
+segment-get('path\to\a\file.txt', '\', -1) -> 'file.txt'
 ```
 
 ### segment-head
