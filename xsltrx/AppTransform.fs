@@ -136,6 +136,7 @@ let private emitJson mode filename xrdr =
 let private initArgumentList o =
   let arglist = new XsltArgumentList()
   SegmentFunctions.AddExtensionObject(arglist)
+  FileSystemFunctions.AddExtensionObject(arglist)
   arglist
 
 let private runTransform o =

@@ -34,3 +34,42 @@ If `count` is negative then recombine all segments except the final `-count`.
 segment-head('path\to\a\file.txt', '\', 2) -> 'path\to'
 segment-head('path\to\a\file.txt', '\', -1) -> 'path\to\a'
 ```
+
+## FilesystemFunctions
+
+XSL extension functions in the namespace `urn:ttelcl:xslt-extension-functions:filesystem`:
+
+### file-name
+`file-name(string fullname)`
+
+Returns the file name part of the argument (with any folder information removed)
+
+### full-name
+`full-name(string fileOrFolder)`
+
+Returns the full path of the given file or folder
+
+### file-extension
+`file-extension(string fileName)`
+
+Returns the (last) file extension of `fileName` (including the leading '.')
+
+
+### parent-folder
+`parent-folder(string fileOrFolder)`
+
+Returns the folder part of the file name or the parent folder part of the folder name.
+
+### file-stem (1 argument version)
+`file-extension(string fileName)`
+
+Returns `fileName` without its folder part and without its last extension
+
+### file-stem (2 arguments version)
+`file-extension(string fileName, string suffixToRemove)`
+
+First removes the folder name from `fileName`. If the file name ends with
+`suffixToRemove`, it returns the file name with that suffix removed. Otherwise
+this function aborts.
+
+

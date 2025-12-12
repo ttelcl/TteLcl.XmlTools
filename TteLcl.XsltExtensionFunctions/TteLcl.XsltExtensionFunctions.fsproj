@@ -12,6 +12,7 @@
 
     <ItemGroup>
         <Compile Include="SegmentFunctions.fs" />
+        <Compile Include="FileSystemFunctions.fs" />
         <None Include="README.md" />
     </ItemGroup>
 
