@@ -72,6 +72,14 @@ Returns `fileName` without its folder part and without its last extension
 
 First removes the folder name from `fileName`. If the file name ends with
 `suffixToRemove`, it returns the file name with that suffix removed. Otherwise
-this function aborts.
+this function aborts. See also `file-stem-if` below.
+
+### file-stem-if
+`file-extension(string fileName, string suffixToRemove)`
+
+First removes the folder name from `fileName`. If the file name ends with
+`suffixToRemove`, it returns the file name with that suffix removed. Otherwise
+this function returns that short file name without any further removals.
+See also `file-stem (2 arguments version)` above.
 
 

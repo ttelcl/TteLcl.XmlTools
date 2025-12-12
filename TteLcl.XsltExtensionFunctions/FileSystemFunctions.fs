@@ -43,3 +43,10 @@ type public FileSystemFunctions () =
     else
       new ArgumentException($"Expecting file name '{shortname}' to end with '{suffixToRemove}'") |> raise
 
+  member public this.``file-stem-if``( fileName:string, suffixToRemove:string ) : string =
+    let shortname = Path.GetFileName(fileName)
+    if shortname.EndsWith(suffixToRemove, StringComparison.OrdinalIgnoreCase) then
+      shortname.Substring(0, shortname.Length - suffixToRemove.Length)
+    else
+      shortname
+
