@@ -8,7 +8,7 @@ of F# (as an example: unlike C#, F# can declare a method named 'get-segment()')
 
 ## SegmentFunctions
 
-XSL extension functions in the namespace `urn:ttelcl:xsltextensionfunctions:segment`:
+XSL extension functions in the namespace `urn:ttelcl:xslt-extension-functions:segment`:
 
 ### get-segment
 `get-segment(string text, string separator, int index)`

@@ -10,7 +10,7 @@ type public SegmentFunctions () =
   /// The XML namespace URI used to register XSL extension functions implemented in this class
   static member public NamespaceUri
     with get() =
-      "urn:ttelcl:xsltextensionfunctions:segment"
+      "urn:ttelcl:xslt-extension-functions:segment"
 
   /// <summary>Create an instance of this class and register it as an extension object
   /// in <paramref name="arglist"/>, using the namespace <see cref="NamespaceUri"/>
