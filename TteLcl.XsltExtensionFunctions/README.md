@@ -82,4 +82,31 @@ First removes the folder name from `fileName`. If the file name ends with
 this function returns that short file name without any further removals.
 See also `file-stem (2 arguments version)` above.
 
+### cwd
+`cwd()`
+
+Returns the full path of the current working directory
+
+### path-combine (and variants)
+`path-combine(nodeset paths)`
+
+Combines the paths in the given node set (combining each relative path with
+its preceding absolute path and starting over at each absolute path).
+
+`path-combine(string path1, string path2)`
+
+`path-combine(string path1, string path2, string path3)`
+
+`path-combine(string path1, string path2, string path3, string path4)`
+
+Combines the explicitly given paths into one.
+
+### split-folder
+`split-folder(string filename)`
+
+Split the filename into folder and name parts and return a `<name-parts>`
+element with `<folder>` and `<name>` children. If there is no folder
+(the name is just a file name without path), the `<folder>` child is omitted.
+If there is no name (the name ends with a path separator), the `<name>` child
+is omitted.
 
