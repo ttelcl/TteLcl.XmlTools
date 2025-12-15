@@ -133,10 +133,12 @@ let private emitJson mode filename xrdr =
       w.WriteLine(json) // TODO: should this be suppressed for Flat format?
     filename |> finishFile
 
-let private initArgumentList o =
+let private initArgumentList pair =
   let arglist = new XsltArgumentList()
   SegmentFunctions.AddExtensionObject(arglist)
   FileSystemFunctions.AddExtensionObject(arglist)
+  arglist.AddParam("inputfile", "", pair.Input)
+  arglist.AddParam("outputfile", "", pair.Output)
   arglist
 
 let private runTransform o =
@@ -223,19 +225,19 @@ let private runTransform o =
       else
         pair
     let pairs = o.InOutPairs |> List.map resolveOutput
-    let transformIntermediate trx (xin:XmlInput) =
+    let transformIntermediate pair trx (xin:XmlInput) =
       cp $"  Applying intermediate transform \fc{trx.XsltFile}\f0."
-      let arglist = o |> initArgumentList
+      let arglist = pair |> initArgumentList
       let xout = trx.LoadedTransform.Transform(xin, arglist, false, 256 (* that's the default *))
       if trx.DiagnosticAbort then
         let diagname = Path.ChangeExtension(Path.GetFileName(trx.XsltFile), ".diag.xml")
         xout |> diagnosticAbort diagname
       xout
-    let transformLast trx outname (xin:XmlInput) =
+    let transformLast pair trx outname (xin:XmlInput) =
       cp $"  Applying final transform \fc{trx.XsltFile}\f0 (mode \fb{trx.LoadedTransform.OutputSettings.OutputMethod}\f0)."
       if trx.DiagnosticAbort then
         cp "  (\frIgnoring \fg-diag\fr for final transform stage\f0)"
-      let arglist = o |> initArgumentList
+      let arglist = pair |> initArgumentList
       do
         use tw = outname |> startFile
         let xout = new XmlOutput(tw)
@@ -246,20 +248,21 @@ let private runTransform o =
       if o.TraceJson then
         JxConversion.ReaderTracer <- (fun rdr message line caller -> traceJson rdr message line caller)
       xrdr |> emitJson o.JsonMode outname
-    let transformJsonLast trx outname (xin:XmlInput) =
-      let xout = xin |> transformIntermediate trx
+    let transformJsonLast pair trx outname (xin:XmlInput) =
+      let xout = xin |> transformIntermediate pair trx
       xout |> transformJson outname
-    let rec transformPipeline outname xin pipeline =
+    let rec transformPipeline pair xin pipeline =
+      let outname = pair.Output
       match pipeline with
       | trx :: [] ->
         if jsonOutput then
-          xin |> transformJsonLast trx outname
+          xin |> transformJsonLast pair trx outname
         else
-          xin |> transformLast trx outname
+          xin |> transformLast pair trx outname
       | trx :: remainder ->
-        let xout = xin |> transformIntermediate trx
+        let xout = xin |> transformIntermediate pair trx
         let xin2 = new XmlInput(xout)
-        remainder |> transformPipeline outname xin2
+        remainder |> transformPipeline pair xin2
       | [] ->
         failwith "Not expecting an empty pipeline here"
     for pair in pairs do
@@ -268,7 +271,7 @@ let private runTransform o =
       cp $"Transforming \fg{input}\f0 to \fo{output}\f0."
       let doc = new XPathDocument(input)
       let xin = new XmlInput(doc)
-      pipeline |> transformPipeline output xin
+      pipeline |> transformPipeline pair xin
     0
 
 let run args =
