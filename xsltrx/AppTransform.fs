@@ -21,8 +21,12 @@ type private OutputDerivation = {
   OutputTail: string
 }
 
+type XmlSource =
+  | XmlFile of string
+  | XmlZipEntry of ZipHostFile: string * ZipEntryName: string
+
 type private InputOutput = {
-  Input: string
+  Input: XmlSource
   Output: string
 }
 
@@ -51,6 +55,7 @@ type private Options = {
   OutputDerivations: OutputDerivation list
   JsonMode: JsonFormat
   TraceJson: bool
+  CurrentZipFile: string
 }
 
 // Debug utility for JsonConversion
@@ -208,20 +213,25 @@ let private runTransform o =
       | JsonFormat.Flat -> ".json"
     let resolveOutput pair =
       if pair.Output |> String.IsNullOrEmpty then
-        let input = pair.Input |> Path.GetFileName
-        let output =
-          if o.OutputDerivations |> List.isEmpty then
-            // silently use the default
-            Path.ChangeExtension(input, defaultExtension)
-          else
-            let attempt = input |> tryDeriveOutput o.OutputDerivations
-            match attempt with
-            | Some(output) -> output
-            | None ->
-              // noisily use the default
-              cp $"\frWarning\f0: no '\fg-O\f0' rule matched '\fy{input}\f0'. Using the default output naming rule."
+        match pair.Input with
+        | XmlSource.XmlFile(xmlfile) ->
+          let input = xmlfile |> Path.GetFileName
+          let output =
+            if o.OutputDerivations |> List.isEmpty then
+              // silently use the default
               Path.ChangeExtension(input, defaultExtension)
-        {pair with Output = output}
+            else
+              let attempt = input |> tryDeriveOutput o.OutputDerivations
+              match attempt with
+              | Some(output) -> output
+              | None ->
+                // noisily use the default
+                cp $"\frWarning\f0: no '\fg-O\f0' rule matched '\fy{input}\f0'. Using the default output naming rule."
+                Path.ChangeExtension(input, defaultExtension)
+          {pair with Output = output}
+        | XmlSource.XmlZipEntry(z,e) ->
+          new NotSupportedException(
+            $"Using a zip entry as input ('-e') requires an explicit output file ('-o')") |> raise
       else
         pair
     let pairs = o.InOutPairs |> List.map resolveOutput
@@ -266,11 +276,21 @@ let private runTransform o =
       | [] ->
         failwith "Not expecting an empty pipeline here"
     for pair in pairs do
-      let input = pair.Input
       let output = pair.Output
-      cp $"Transforming \fg{input}\f0 to \fo{output}\f0."
-      let doc = new XPathDocument(input)
-      let xin = new XmlInput(doc)
+      let inputLabel =
+        match pair.Input with
+        | XmlSource.XmlFile(inputFile) ->
+          $"\fg{inputFile}\f0"
+        | XmlSource.XmlZipEntry(zipFile, entryPath) ->
+          $"zip entry \fy{entryPath}\f0 in \fg{zipFile}\f0"
+      cp $"Transforming {inputLabel} to \fo{output}\f0."
+      let xin =
+        match pair.Input with
+        | XmlSource.XmlFile(inputFile) ->
+          let doc = new XPathDocument(inputFile)
+          new XmlInput(doc)
+        | XmlSource.XmlZipEntry(zipFile, entryPath) ->
+          new NotImplementedException("ZIP entry input NYI") |> raise
       pipeline |> transformPipeline pair xin
     0
 
@@ -285,10 +305,22 @@ let run args =
       None
     | "-f" :: file :: rest ->
       let pair = {
-        Input = file
+        Input = XmlSource.XmlFile(file)
         Output = null
       }
       rest |> parseMore {o with InOutPairs = pair :: o.InOutPairs}
+    | "-e" :: entry :: rest ->
+      if o.CurrentZipFile |> String.IsNullOrEmpty then
+        cp "\frExpecting a \fy-zip\fr argument before the first \fy-e\fr argument\f0."
+        None
+      else
+      let pair = {
+        Input = XmlSource.XmlZipEntry(o.CurrentZipFile, entry)
+        Output = null
+      }
+      rest |> parseMore {o with InOutPairs = pair :: o.InOutPairs}
+    | "-zip" :: zipfile :: rest ->
+      rest |> parseMore {o with CurrentZipFile = zipfile}
     | "-s" :: stylesheet :: rest ->
       let stage = {
         TransformFile = stylesheet
@@ -301,7 +333,7 @@ let run args =
         let pair = {head with Output = outfile}
         rest |> parseMore {o with InOutPairs = pair :: others}
       | [] ->
-        cp $"\fr'fg-o \f0{outfile}\fr' applies to the preceding '\fg-f\fr', but there were none of those yet\f0."
+        cp $"\fr'fg-o \f0{outfile}\fr' applies to the preceding '\fg-f\fr' or '\fg-e\fr', but there were none of those yet\f0."
         None
     | "-doc" :: rest ->
       // Voodoo inferred from https://stackoverflow.com/a/77903294/271323
@@ -351,6 +383,7 @@ let run args =
     OutputDerivations = []
     JsonMode = JsonFormat.NotJson
     TraceJson = false
+    CurrentZipFile = null
   }
   match oo with
   | Some(o) ->
