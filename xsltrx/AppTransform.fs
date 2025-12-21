@@ -2,6 +2,7 @@
 
 open System
 open System.IO
+open System.IO.Compression
 open System.Xml
 open System.Xml.XPath
 open System.Xml.Xsl
@@ -284,13 +285,23 @@ let private runTransform o =
         | XmlSource.XmlZipEntry(zipFile, entryPath) ->
           $"zip entry \fy{entryPath}\f0 in \fg{zipFile}\f0"
       cp $"Transforming {inputLabel} to \fo{output}\f0."
-      let xin =
+      let xin, (resource: IDisposable) =
         match pair.Input with
         | XmlSource.XmlFile(inputFile) ->
           let doc = new XPathDocument(inputFile)
-          new XmlInput(doc)
+          new XmlInput(doc), null
         | XmlSource.XmlZipEntry(zipFile, entryPath) ->
-          new NotImplementedException("ZIP entry input NYI") |> raise
+          let za = ZipFile.OpenRead(zipFile)
+          let e = za.GetEntry(entryPath)
+          if e = null then
+            za.Dispose()
+            failwith "Zip entry not found"
+          let tr = new StreamReader(e.Open())
+          let settings = new XmlReaderSettings()
+          settings.DtdProcessing <- DtdProcessing.Ignore
+          let xr = XmlReader.Create(tr, settings)
+          new XmlInput(xr), za
+      use resource = resource
       pipeline |> transformPipeline pair xin
     0
 
